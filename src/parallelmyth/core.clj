@@ -32,11 +32,29 @@
       (recur (unchecked-inc i) (assoc init :i i))
       init)))
 
+;;jdk8
 ;;parallelmyth.core> (vec-n map-work :n 1 :k 100000000)
 ;;[{:i 99999999}]
 
 ;;parallelmyth.core> (time-n map-work :n 96 :k 100000000)
 ;;"Elapsed time: 9498.673168 msecs"
+
+
+;;jdk17 - default gc.
+;; parallelmyth.core> (time-n map-work :n 1 :k 100000000)
+;; "Elapsed time: 1349.456787 msecs"
+;; 1
+;; parallelmyth.core> (time-n map-work :n 96 :k 100000000)
+;; "Elapsed time: 9438.664164 msecs"
+;; 96
+
+;;graalvm 20.0.2
+;; parallelmyth.core> (time-n map-work :n 1 :k 100000000)
+;; "Elapsed time: 2006.764811 msecs"
+;; 1
+;; parallelmyth.core> (time-n map-work :n 96 :k 100000000)
+;; "Elapsed time: 10928.452581 msecs"
+;; 96
 
 (defn map-work-muthf [^long n]
   (loop [i 0
@@ -45,6 +63,8 @@
     (if (< i n)
       (recur (unchecked-inc i) (doto init (.put :i i)))
       (hf/persistent! init))))
+
+
 
 (defn map-work-muthfint [^long n]
   (loop [i 0
@@ -61,3 +81,21 @@
     (if (< i n)
       (recur (unchecked-inc i) (doto init (.put 0 i)))
       (hf/persistent! init))))
+
+
+;;jdk17 defaultgc 
+;; parallelmyth.core> (time-n map-work-muthfjint  :n 1 :k 100000000)
+;; "Elapsed time: 365.818796 msecs"
+;; 1
+;; parallelmyth.core> (time-n map-work-muthfjint  :n 96 :k 100000000)
+;; "Elapsed time: 10251.174571 msecs"
+;; 96
+
+
+;;graalvm 20.0.2
+;; parallelmyth.core> (time-n map-work-muthfjint  :n 1 :k 100000000)
+;; "Elapsed time: 794.895727 msecs"
+;; 1
+;; parallelmyth.core> (time-n map-work-muthfjint  :n 96 :k 100000000)
+;; "Elapsed time: 8256.160891 msecs"
+;; 96
