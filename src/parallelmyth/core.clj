@@ -1,6 +1,9 @@
 ;;tests on an AMD EPYC hpc7a.96xlarge
 (ns parallelmyth.core
-  (:require [ham-fisted.api :as hf]))
+  (:require [ham-fisted.api :as hf])
+  (:import [java.util.concurrent ConcurrentHashMap]
+           [java.util.function Function]))
+
 
 
 (defn work [^long n]
@@ -99,3 +102,90 @@
 ;; parallelmyth.core> (time-n map-work-muthfjint  :n 96 :k 100000000)
 ;; "Elapsed time: 8256.160891 msecs"
 ;; 96
+
+(defn map-work-muthfjconst [^long n]
+  (loop [i 0
+         ^java.util.Map
+         init (hf/java-hashmap)]
+    (if (< i n)
+      (recur (unchecked-inc i) (doto init (.put 0 1)))
+      (hf/persistent! init))))
+
+
+(defn map-work-muthfjkey [^long n]
+  (loop [i 0
+         ^java.util.Map
+         init (hf/java-hashmap)]
+    (if (< i n)
+      (recur (unchecked-inc i) (doto init (.put 0 :hello)))
+      (hf/persistent! init))))
+
+(def global (atom 0))
+(defn map-work-muthfjkeyatom [^long n]
+  (loop [i 0
+         ^java.util.Map
+         init (hf/java-hashmap)]
+    (if (< i n)
+      (recur (unchecked-inc i) (doto init (.put 0 (deref global))))
+      (hf/persistent! init))))
+
+
+(defn Func ^Function [f]
+  (reify Function
+    (apply [this v] (f v))))
+
+(defn get-binding! [^ConcurrentHashMap ctx k ^Function f]
+  (.computeIfAbsent ctx k f))
+
+(defmacro pseudo-thread-local [[id init] & body]
+  `(let [ctx#        (ConcurrentHashMap.)
+         init-fn#    (Func (fn [k#] ~init))
+         ~id         (reify clojure.lang.IDeref
+                       (deref [this#]
+                         (get-binding! ctx# (.getId (Thread/currentThread)) init-fn#)))]
+     ~@body))
+
+#_
+(pseudo-thread-local [gen (java.util.Random.)]
+  (defn rand!
+    (^double []
+     (.nextDouble ^java.util.Random @gen))
+    (^double [n]
+     (* n (rand!))))
+  (defn rand-int! [n]
+    (int (rand! n))))
+
+
+;;slow, contended.
+(defn map-work-muthfjrandvec [^long n]
+  (loop [i 0
+         ^java.util.Map
+         init (hf/java-hashmap)]
+    (if (< i n)
+      (let [entry [(rand-int 10) (rand-int 10)]]
+        (recur (unchecked-inc i) (doto init (.put 0 entry))))
+      (hf/persistent! init))))
+
+
+(def ^:dynamic *rng* (java.util.Random.))
+
+(defn rand!
+  (^double []
+   (.nextDouble ^java.util.concurrent.ThreadLocalRandom
+      (java.util.concurrent.ThreadLocalRandom/current)))
+  (^double [n]
+   (* n (rand!))))
+
+(defn rand-int! ^long [n]
+  (int (rand! n)))
+
+;;can hit up to 32x semi consistently with 32 threads.
+(defn map-work-muthfjrandvec! [^long n]
+  (loop [i 0
+         ^java.util.Map
+         init (hf/java-hashmap)]
+    (if (< i n)
+      (let [entry [(rand-int! 10)
+                   (rand-int! 10)]]
+        (recur (unchecked-inc i) (doto init (.put 0 entry))))
+      (hf/persistent! init))))

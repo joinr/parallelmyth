@@ -5,4 +5,4 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [com.cnuernber/ham-fisted "1.003"]]
-  :jvm-opts ^:replace ["-Xmx700g" "-XX:NewSize=4g"])
+  :jvm-opts ^:replace ["-Xmx700g" "-XX:NewSize=4g" "-XX:+UseParallelGC"])
